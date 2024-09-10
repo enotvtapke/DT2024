@@ -18,15 +18,21 @@
    second' = flip (second 0)
 -}
 
+\func second (_ x _ : Nat): Nat => x
+\func apply (f : Nat -> Nat) (x : Nat): Nat => f x
+\func compose (f g : Nat -> Nat) (x : Nat): Nat => f (g x)
+\func flip (f : Nat -> Nat -> Nat) (x y : Nat) => f y x
+\func second' => flip (second 0)
+
 -- 3. Расставьте приоритеты функций f1, f2, f3, f4, f5 и f6 так, чтобы функция test проходила тайпчекинг.
 
 \import lect01 \hiding (+,*)
 
 \func f1 (x y : Nat) => x
 \func f2 : Nat => 0
-\func f3 (f : Nat -> Nat) (z : Nat) : Int => 0
+\func \infixl 1 f3 (f : Nat -> Nat) (z : Nat) : Int => 0
 \func f4 : Nat => 0
-\func f5 => f1
+\func \infixl 2 f5 => f1
 \func f6 => f4
 
 \func test => f1 f2 f3 f4 f5 f6
@@ -38,20 +44,43 @@
    if False _ e = e
 -}
 
+\func if (p b1 b2 : Bool) : Bool \elim p
+  | true => b1
+  | false => b2
+
 -- 5. Определите || через if.
 
-\func \infixr 2 || (x y : Bool) : Bool => {?}
+\func \infixr 2 || (x y : Bool) : Bool => if x x (if y y false)
 
 -- 6. Определите возведение в степень и факториал для натуральных чисел.
 
 \open Nat \hiding (-,div) -- Здесь лежат + и *.
 
-\func \infixr 8 ^ (x y : Nat) => {?}
+\func \infixr 8 ^ (x y : Nat): Nat \elim y
+  | 0 => 1
+  | suc y => x * x ^ y
 
-\func fac (x : Nat) => {?}
+\func fac (x : Nat): Nat
+  | 0 => 1
+  | suc x => suc x * x
 
 -- 7. Определите mod и gcd.
 
-\func mod (x y : Nat) => {?}
+\func mod (x y : Nat) => x - div x y * y
 
-\func gcd (x y : Nat) => {?}
+\func gcd (x y : Nat): Nat => aux (if' (x < y) y x) x y
+  \where {
+    \func aux (fuel x y : Nat) : Nat \elim fuel
+      | 0 => 1
+      | suc fuel => if' (x = y) x (if' (x < y) (aux fuel x (y - x)) (aux fuel (x - y) y))
+
+    \func \infix 4 = (x y : Nat) : Bool
+      | 0, 0 => true
+      | 0, suc y => false
+      | suc x, 0 => false
+      | suc x, suc y => x = y
+
+    \func if' (x : Bool) (t e : Nat) : Nat \elim x
+      | true => t
+      | false => e
+  }
