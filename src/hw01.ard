@@ -62,7 +62,7 @@
 
 \func fac (x : Nat): Nat
   | 0 => 1
-  | suc x => suc x * x
+  | suc x => suc x * fac x
 
 -- 7. Определите mod и gcd.
 
