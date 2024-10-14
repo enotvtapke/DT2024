@@ -1,5 +1,12 @@
 \import Data.Bool
+\import Data.List (length, List)
+\import Function.Meta
+\import Paths
+\import lect01 (*)
+\import lect02 (T)
 \import lect04
+\open Nat (+)
+
 
 -- 1. Напишите функцию lookup, которая принимает List A и натуральное число и возвращает элемент по заданому индексу.
 --    В общем случае эту функцию определить невозможно, т.к. индекс может быть больше, чем число элементов в списке.
@@ -11,60 +18,124 @@
   | suc x, 0 => false
   | suc x, suc y => x < y
 
-\func lookup => {?}
+\func lookup {A : \Type} (xs : List A) (i : Nat) (t : T (i < length xs)) : A \elim xs, i
+  | List.nil, 0 => \case t
+  | List.nil, suc i => \case t
+  | a List.:: xs, 0 => a
+  | a List.:: xs', suc i' => lookup xs' i' t
 
 -- 2. Реализуйте аналоги функции replicate для vec и Vec (эта функция создает список заданной длины, состоящий из повторений данного элемента).
 
+\func replicate {A : \Type} (a : A) (n : Nat) : vec A n \elim n
+  | 0 => ()
+  | suc n => (a, replicate a n)
+
+\func replicate' {A : \Type} (a : A) (n : Nat) : Vec A n \elim n
+  | 0 => nil
+  | suc n => cons a $ replicate' a n
+
 -- 3. Реализуйте аналоги функции map для vec и Vec.
+
+\func map {A B : \Type} {n : Nat} (f : A -> B) (v : vec A n) : vec B n \elim n, v
+  | 0, v => ()
+  | suc n, (x, xs) => (f x, map f xs)
+
+\func map' {A B : \Type} {n : Nat} (f : A -> B) (v : Vec A n) : Vec B n \elim n, v
+  | 0, v => nil
+  | suc n, cons x xs => cons (f x) $ map' f xs
 
 -- 4. Реализуйте аналоги функции zipWith для vec и Vec.
 --    Функция должна принимать вектора одинаковой длины.
 
+\func zipWith {A B : \Type} {n : Nat} (v1 : vec A n) (v2 : vec B n) : vec (\Sigma A B) n \elim n, v1, v2
+  | 0, (), () => ()
+  | suc n, (a1, v1), (a2, v2) =>  ((a1, a2), zipWith v1 v2)
+
+\func zipWith' {A B : \Type} {n : Nat} (v1 : Vec A n) (v2 : Vec B n) : Vec (\Sigma A B) n \elim n, v1, v2
+  | 0, nil, nil => nil
+  | suc n, cons a1 v1, cons a2 v2 => cons (a1, a2) $ zipWith' v1 v2
+
 -- 5. Определите тип CTree A n полных бинарных деревьев высоты ровно n, которые хранят элементы только во внутренних узлах, но не в листьях.
 --    Высота листа равна 0.
 
-\data CTree (A : \Type) (n : Nat)
+\data CTree (A : \Type) (n : Nat) \elim n
+  | 0 => CLeaf
+  | suc n => CBranch A (CTree A n) (CTree A n)
 
 -- 6. Определите тип Tree A n бинарных деревьев высоты не больше n, которые хранят элементы только во внутренних узлах, но не в листьях.
 --    Высота листа равна 0.
 
-\data Tree (A : \Type) (n : Nat)
+\data Tree (A : \Type) (n : Nat) \elim n
+  | n => Leaf
+  | suc n => Branch A (Tree A n) (Tree A n)
 
 -- определите функцию, возвращающую высоту дерева.
 
-\func height {A : \Type} (n : Nat) (t : Tree A n) : Fin (suc n) => {?}
+\func height {A : \Type} (n : Nat) (t : Tree A n) : Fin (suc n) \elim n, t
+  | n, Leaf => fzero
+  | suc n, Branch a t1 t2 => \let | b1 => height n t1
+                                  | b2 => height n t2
+                              \in fsuc $ if (toNat b2 < toNat b1) (height n t1) (height n t2)
 
 -- 7. Функции Fin n -> A соответствуют спискам элементов A длины n.
 --     Функция, преобразующая Vec A n в Fin n -> A, была реализована на лекции.
 --     Реализуйте обратную функцию.
 
-\func coin {A : \Type} {n : Nat} (f : Fin n -> A) : Vec A n => {?}
+\func coin {A : \Type} {n : Nat} (f : Fin n -> A) : Vec A n \elim n
+  | 0 => nil
+  | suc n => cons (f fzero) (coin {_} {n} (\lam x => f (fsuc x)))
 
 -- Optional task
 -- 8. Определите тип матриц и ряд функций над ними.
 
-\func Mat (A : \Type) (n m : Nat) : \Type => {?}
+\func Mat (A : \Type) (n m : Nat) : \Type => Vec (Vec A m) n
 
 -- диагональная матрица с элементами e на диагонали и z на остальных позициях.
 
-\func diag {A : \Type} (z e : A) (n : Nat) : Mat A n n => {?}
+\func diag {A : \Type} (z e : A) (n : Nat) : Mat A n n \elim n
+  | 0 => nil
+  | suc n => cons (cons e (replicate' z n)) (map' (cons z) $ diag z e n)
 
 -- транспонирование матриц
 
-\func transpose {A : \Type} {n m : Nat} (M : Mat A n m) : Mat A m n => {?}
+\func transpose {A : \Type} {n m : Nat} (M : Mat A n m) : Mat A m n \elim n, m
+  | 0, 0 => nil
+  | 0, suc m => replicate' nil (suc m)
+  | suc n, 0 => nil
+  | suc n, suc m => cons (map' Head M) $ map' (\lam (y, ys) => cons y ys) (zipWith' (Tail $ Head M) (transpose $ Tail (map' Tail M)))
 
 -- сложение матриц
 
-\func matAdd {A : \Type} (add : A -> A -> A) (n m : Nat) (M N : Mat A n m) : Mat A n m => {?}
+\func matAdd {A : \Type} (add : A -> A -> A) (n m : Nat) (M N : Mat A n m) : Mat A n m \elim n
+  | 0 => nil
+  | suc n => cons (map' (\lam (a, b) => add a b) $ zipWith' (Head M) (Head N)) $ matAdd add n m (Tail M) (Tail N)
 
 -- умножение матриц
 
 -- z ─ нейтральный элемент по сложению.
-\func matMul {A : \Type} (z : A) (add mul : A -> A -> A) (n m k : Nat) (M : Mat A n m) (N : Mat A m k) : Mat A n k => {?}
+\func matMul {A : \Type} (z : A) (add mul : A -> A -> A) (n m k : Nat) (M : Mat A n m) (N : Mat A m k) : Mat A n k \elim n
+  | 0 => nil
+  | suc n => cons (map' (\lam (xs, ys) => reduce' z add $ map' (\lam (x, y) => mul x y) $ zipWith' xs ys) (zipWith' (replicate' (Head M) k) (transpose N))) $ matMul z add mul n m k (Tail M) N
+
+\func reduce' {A B : \Type} {n : Nat} (init : B) (f : A -> B -> B) (v : Vec A n) : B \elim n, v
+  | 0, nil => init
+  | suc n, cons a v => f a $ reduce' init f v
 
 -- 9. Определите факториал через Nat-rec.
 
+\func fac' (n : Nat) : Nat \elim n
+  | 0 => 1
+  | suc n => suc n * fac' n
+
+\func fac (n : Nat) : Nat => Nat-rec Nat 1 (\lam _ x => n * x) n
+
 -- 10. Докажите ассоциативность сложения для натуральных чисел через Nat-elim.
+
+\func +-assoc' (x y z : Nat) : (x + y) + z = x + (y + z) \elim x
+  | 0 => idp
+  | suc x => pmap suc (+-assoc' x y z)
+
+\func +-assoc (x y z : Nat) : (x + y) + z = x + (y + z) => Nat-elim (\lam x => (x + y) + z = x + (y + z)) idp (\lam _ p => pmap suc p) x
 
 -- 11. Определите рекурсор и элиминатор для D.
 
@@ -73,6 +144,23 @@
   | con2 D D
   | con3 (Nat -> D)
 
+\func D-elim (P : D -> \Type)
+               (c1 : \Pi (n : Nat) -> P (con1 n))
+               (c2 : \Pi (d1 d2 : D) -> P d1 -> P d2 -> P (con2 d1 d2))
+               (c3 : \Pi (f : Nat -> D) -> (\Pi (n : Nat) -> P $ f n) -> P (con3 f))
+               (x : D) : P x
+\elim x
+  | con1 n => c1 n
+  | con2 d1 d2 => c2 d1 d2 (D-elim P c1 c2 c3 d1) (D-elim P c1 c2 c3 d2)
+  | con3 f => c3 f $ (\lam n => D-elim P c1 c2 c3 (f n))
+
+\func D-rec (P : \Type)
+            (c1 : Nat -> P)
+            (c2 : D -> D -> P -> P -> P)
+            (c3 : (Nat -> D) -> (Nat -> P) -> P)
+            (x : D) : P
+  => D-elim (\lam _ => P) c1 c2 c3 x
+
 {- To check that the definition of D-elim and D-rec is correct, you can try to implement foo using D-rec.
 \func foo (d : D) : Nat
   | con1 n => n
@@ -80,4 +168,27 @@
   | con3 g => foo (g (foo (g 100)))
 -}
 
+\func foo (d : D) : Nat
+  | con1 n => n
+  | con2 d1 d2 => foo d1 Nat.+ foo d2
+  | con3 g => foo (g (foo (g 100)))
+
+\func foo' (d : D) : Nat => D-rec Nat (\lam n => n) (\lam _ _ p1 p2 => p1 Nat.+ p2) (\lam _ p1 => p1 $ p1 100) d
+
 -- 12. Определите рекурсор и элиминатор для List.
+
+\func List-elim {A : \Type}
+                (P : List A -> \Type)
+                (n : P List.nil)
+                (c : \Pi (e : A) (d1 : List A) -> P d1 -> P (e List.:: d1))
+                (x : List A) : P x
+\elim x
+  | List.nil => n
+  | a List.:: x => c a x (List-elim P n c x)
+
+\func List-rec {A : \Type}
+               (P : \Type)
+               (n : P)
+               (c : \Pi (e : A) (d1 : List A) -> P -> P)
+               (x : List A) : P
+=> List-elim (\lam _ => P) n c x
