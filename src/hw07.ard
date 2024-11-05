@@ -1,37 +1,59 @@
 \import Data.Maybe
 \import Logic
+\import Order.StrictOrder
+\import Paths.Meta
 \import lect07
-\open Nat(+)
+\open Nat(+, mod)
 
 -- 1. Определите функцию swap несколькими способами.
 
 -- При помощи \cowith и доступа к полям.
-\func swap {A B : \Type} (p : Pair A B) : Pair B A => {?}
+\func swap {A B : \Type} (p : Pair A B) : Pair B A \cowith
+  | fst_ => p.snd_
+  | snd_ => p.fst_
 
 -- При помощи \new и паттерн матчинга.
-\func swap' {A B : \Type} (p : Pair A B) : Pair B A => {?}
+\func swap' {A B : \Type} (p : Pair A B) : Pair B A \elim p
+  | (a,b) => \new Pair { | fst_ => b | snd_ => a }
 
 -- При помощи \new и доступа к полям.
-\func swap'' {A B : \Type} (p : Pair A B) : Pair B A => {?}
+\func swap'' {A B : \Type} (p : Pair A B) : Pair B A => \new Pair B A p.snd_ p.fst_
 
 -- 2. Докажите, что swap (swap p) = p.
 
-\func swap-involutive {A B : \Type} (p : Pair A B) : swap (swap p) = p => {?}
+\func swap-involutive {A B : \Type} (p : Pair A B) : swap (swap p) = p => idp
 
 -- 3. Докажите, что тип PosNat 0 пустой, а тип PosNat 1 нет.
 
-\func zero-isNotPos (p : PosNat 0) : Empty => {?}
+\func zero-isNotPos (p : PosNat 0) : Empty => \case p.p
 
-\func one-isPos : PosNat 1 => {?}
+\func one-isPos : PosNat 1 => \new PosNat { | p => () }
 
 -- 4. Определите \record, состоящий из пар взаимно простых натуральных чисел.
 --    Определите тип, состоящий из натуральных чисел, взаимно простых с 60.
 
+\record PrimalPair (a b : Nat) (p : Not (\Sigma (d : Nat) (p1 : a mod d = 0) (p2 : b mod d = 0) (p3 : Not (d = 1))))
+
+\func Pair60 : \Type => PrimalPair { | a => 60 }
+
 -- 5. Закончите определение класса монад. Этот класс должен содержать все монадные законы и реализовывать все поля из класса функторов.
 
-\class Monad \extends Functor
+\class Monad \extends Functor {
   | return {A : \Set} : A -> F A
   | \infixl 1 >>= {A B : \Set} : F A -> (A -> F B) -> F B
+  | return-left-ident {A B : \Set} (x : A) (f : A -> F B) : (return x >>= f) = f x
+  | return-right-ident {A : \Set} (x : F A) : (x >>= return) = x
+  | bind-assoc {A B C : \Set} (f : A -> F B) (g : B -> F C) (x : F A) : (x >>= \lam y => f y >>= g) = (x >>= f >>= g)
+  \default fmap {A B : \Set} (f : A -> B) (x : F A): F B => x >>= \lam y => return (f y)
+  \default fmap-id {A : \Set} (x : F A) : fmap (\lam a => a) x = x => return-right-ident x
+  \default  fmap-comp {A B C : \Set} (f : A -> B) (g : B -> C) (x : F A) : fmap (\lam a => g (f a)) x = fmap g (fmap f x) => {?}
+    rewriteI (\lam y => return-left-ident (f y) (\lam x  => return (g x))) {?} {?}
+    \where
+      \func aux {M : Monad} {A B C : \Set} {_ : M.F A}  {_ : M.F B}  {_ : M.F C} (f : A -> B) (g : B -> C) (y : A) : (return (g (f y))) = (return (f y) >>= (\lam (x : B) => return (g x))) => {?}
+--   (\lam (x : B) => return {C} (g x))
+    -- f x
+--     bind-assoc (\lam x => return (f x)) (\lam x => return (g x)) x
+}
 
 -- 6. Определите \instance Monad для Maybe.
 
