@@ -1,14 +1,68 @@
 \import Data.Bool
 \import Data.List \hiding (headDef)
+\import Function.Meta
+\import Meta
+\import Paths
+\import Paths.Meta
+\import Set.Partial
 \import hw06
 \import lect08
 \import Order.LinearOrder
 \open LinearOrder
+\open So (fromSo, toSo)
 
 -- 1. Реализуйте функцию filter и докажите ее корректность, то есть, что выполнены следующие условия:
 --    * filter p xs является подсписком xs
 --    * Все элементы filter p xs удовлетворяют предикату p
 --    * Любой подсписок xs с тем же свойством является подсписком filter p xs
+
+\func filter { A : \Type } (f : A -> Bool) (xs : List A): List A \elim xs
+  | nil => nil
+  | a :: xs => if (f a) (a :: filter f xs) (filter f xs)
+  \where
+    \func filter-sublist { A : \Type } (f : A -> Bool) (xs : List A) : SubList (filter f xs) xs \elim xs
+      | nil => sublist-nil
+      | a :: xs => cases (f a) \with {
+        | false => sublist-pref (filter-sublist f xs)
+        | true => sublist-inf idp (filter-sublist f xs)
+      }
+    \func filter-all { A : \Type } (f : A -> Bool) (xs : List A) : All (\lam x => So (f x)) (filter f xs) \elim xs
+      | nil => all-nil
+      | a :: ys => cases (f a arg addPath) \with {
+        | false, p => filter-all f ys
+        | true, p => all-:: (toSo p) (filter-all f ys)
+      }
+    \func list-filter-sublist { A : \Type }
+                              (f : A -> Bool) (xs ys : List A)
+                              (xs-sub : SubList xs ys) (xs-all : All (\lam x => So (f x)) xs) : SubList xs (filter f ys) \elim xs, ys
+      | nil, _ => sublist-nil
+      | a :: xs, nil => \case xs-sub
+      | a :: xs, b :: ys => cases (f b arg addPath) \with {
+        | false, p => \case xs-sub \with {
+          | sublist-inf p1 s => \case xs-all \with {
+            | all-:: p2 a1 => \let x => fromSo p2 | y => rewriteI p1 p | z => rewrite y x \in \case z
+          }
+          | sublist-pref s => list-filter-sublist f (a :: xs) ys s xs-all
+        }
+        | true, p => \case xs-all, xs-sub \with {
+          | all-:: p1 a1, sublist-inf p2 s => sublist-inf p2 $ list-filter-sublist f xs ys s a1
+          | all-:: p1 a1, sublist-pref s => \let x => fromSo p1 \in sublist-pref $ list-filter-sublist f (a :: xs) ys s xs-all
+        }
+      }
+
+\data All { A : \Type } (p : A -> \Type) (xs : List A) \elim xs
+  | nil => all-nil
+  | x :: xs => all-:: (p x) (All p xs)
+
+\data SubList { A : \Type } (xs ys : List A) \elim xs, ys
+  | nil, _ => sublist-nil
+  | x :: xs, y :: ys => sublist-inf (x = y) (SubList xs ys)
+  | xs, y :: ys => sublist-pref (SubList xs ys)
+
+\func sublist-refl { A : \Type } (xs : List A) : SubList xs xs \elim xs
+  | nil => sublist-nil
+  | a :: xs => sublist-inf idp (sublist-refl xs)
+
 
 -- 2. Докажите, что Perm l1 l2 тогда и только тогда, когда Insertion.sort l1 = Insertion.sort l2.
 
