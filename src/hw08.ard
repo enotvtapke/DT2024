@@ -1,15 +1,21 @@
 \import Data.Bool
 \import Data.List \hiding (headDef)
+\import Data.Or
 \import Function.Meta
 \import Meta
+\import Order.PartialOrder
+\import Order.StrictOrder
 \import Paths
 \import Paths.Meta
 \import Set.Partial
 \import hw06
+\import lect05 (funExt)
 \import lect08
 \import Order.LinearOrder
 \open LinearOrder
 \open So (fromSo, toSo)
+\open Insertion (sort)
+\open StrictPoset (<_/=)
 
 -- 1. Реализуйте функцию filter и докажите ее корректность, то есть, что выполнены следующие условия:
 --    * filter p xs является подсписком xs
@@ -32,22 +38,17 @@
         | false, p => filter-all f ys
         | true, p => all-:: (toSo p) (filter-all f ys)
       }
-    \func list-filter-sublist { A : \Type }
+    \func list-filter-sublist {A : \Type}
                               (f : A -> Bool) (xs ys : List A)
-                              (xs-sub : SubList xs ys) (xs-all : All (\lam x => So (f x)) xs) : SubList xs (filter f ys) \elim xs, ys
-      | nil, _ => sublist-nil
-      | a :: xs, nil => \case xs-sub
-      | a :: xs, b :: ys => cases (f b arg addPath) \with {
-        | false, p => \case xs-sub \with {
-          | sublist-inf p1 s => \case xs-all \with {
-            | all-:: p2 a1 => \let x => fromSo p2 | y => rewriteI p1 p | z => rewrite y x \in \case z
-          }
-          | sublist-pref s => list-filter-sublist f (a :: xs) ys s xs-all
-        }
-        | true, p => \case xs-all, xs-sub \with {
-          | all-:: p1 a1, sublist-inf p2 s => sublist-inf p2 $ list-filter-sublist f xs ys s a1
-          | all-:: p1 a1, sublist-pref s => \let x => fromSo p1 \in sublist-pref $ list-filter-sublist f (a :: xs) ys s xs-all
-        }
+                              (xs-sub : SubList xs ys) (xs-all : All (\lam x => So (f x)) xs) : SubList xs (filter f ys) \elim xs, ys, xs-sub, xs-all
+      | nil, _, _, _ => sublist-nil
+      | a :: xs, b :: ys, sublist-inf p1 xs-sub, all-:: p2 xs-all => cases (f b arg addPath) \with {
+        | false, p => \let x => fromSo p2 | y => rewriteI p1 p | z => rewrite y x \in \case z
+        | true, p => sublist-inf p1 $ list-filter-sublist f xs ys xs-sub xs-all
+      }
+      | a :: xs, b :: ys, sublist-pref xs-sub, all-:: p1 xs-all' => cases (f b arg addPath) \with {
+        | false, p => list-filter-sublist f (a :: xs) ys xs-sub (all-:: p1 xs-all')
+        | true, p => sublist-pref $ list-filter-sublist f (a :: xs) ys xs-sub (all-:: p1 xs-all')
       }
 
 \data All { A : \Type } (p : A -> \Type) (xs : List A) \elim xs
@@ -65,11 +66,54 @@
 
 
 -- 2. Докажите, что Perm l1 l2 тогда и только тогда, когда Insertion.sort l1 = Insertion.sort l2.
+\func \infix 4 <-> (A B : \Type) => \Sigma (A -> B) (B -> A)
+
+\func perm-sort { A : Dec } {xs ys : List A} (p : Perm xs ys) : sort xs = sort ys \elim xs, ys, p
+  | nil, nil, perm-nil => idp
+  | a :: xs, b :: ys, perm-:: p p1 => rewrite p $ pmap (sort.insert b) $ perm-sort p1
+  | xs, zs, perm-trans p1 p2 => \let x => perm-sort p1 | y => perm-sort p2 \in x *> y
+--   | a :: (a1 :: xs), b :: (b1 :: ys), perm-swap p p1 p2 => cases (xs, ys) \with {
+--     | nil, nil => mcases \with {
+--       | inl x<a, inl x<a1 => \let a1<b1 => rewrite p x<a | y => <-transitive a1<b1 x<a1 | z => rewrite p1 y \in \case <-irreflexive z
+--       | inl x<a, inr a<=x => rewrite (p, p1) idp
+--       | inr a<=x, inl x<a => rewrite (p, p1) idp
+--       | inr a<=x, inr a<=x1 => \let x => rewrite p a<=x | y => <=-transitive a<=x1 x \in {?}
+--     }
+--     | nil, a2 :: l => mcases \with {
+--       | inl x<a => {?}
+--       | inr a<=x => {?}
+--     }
+--     | a2 :: l, nil => mcases \with {
+--       | inl x<a => {?}
+--       | inr a<=x => {?}
+--     }
+--     | a2 :: l, a3 :: l1 => {?}
+--   }
+  | a :: (a1 :: xs), b :: (b1 :: ys), perm-swap p p1 p2 => {?}
+
+\func insert-swap {A : Dec} (xs : List A) (a b : A) : sort.insert a (sort.insert b xs) = sort.insert b (sort.insert a xs) \elim xs
+  | nil => {?}
+  | c :: xs => mcases \with {
+    | inl x<a, inl x<a1 => {?}
+    | inl x<a, inr a<=x => {?}
+    | inr a<=x, inl x<a => {?}
+    | inr a<=x, inr a<=x1 => {?}
+  }
 
 -- 3. Докажите, что спецификация "результат является перестановкой входа и отсортирован" является полной для функции sort.
 
-\func completeness {A : Dec} (sort : List A -> List A) (l : List A) (p : Perm l (sort l)) (s : Sorted (sort l)) : sort l = Insertion.sort l
-  => {?}
+\func completeness {A : Dec} (sort : List A -> List A) (l : List A) (p : Perm l (sort l)) (s : Sorted (sort l)) : sort l = Insertion.sort l \elim l, s
+  | nil, s => cases (sort nil arg addPath) \with {
+    | nil, p  => idp
+    | a :: l, p => cases p \with {
+      | p1 => {?}
+    }
+  }
+  | a :: l, s => cases (sort (a :: l)) \with {
+    | nil => {?}
+    | a1 :: x => {?}
+  }
+
 
 -- 4. Определите факториал через хвостовую рекурсию.
 --    Докажите, что он равен обычному определению факториала.
