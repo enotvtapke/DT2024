@@ -1,3 +1,4 @@
+\import Arith.Nat
 \import Data.Bool
 \import Data.List \hiding (headDef)
 \import Data.Or
@@ -16,6 +17,8 @@
 \open So (fromSo, toSo)
 \open Insertion (sort)
 \open StrictPoset (<_/=)
+\open Nat (*)
+\open NatSemiring (*-comm)
 
 -- 1. Реализуйте функцию filter и докажите ее корректность, то есть, что выполнены следующие условия:
 --    * filter p xs является подсписком xs
@@ -117,6 +120,26 @@
 
 -- 4. Определите факториал через хвостовую рекурсию.
 --    Докажите, что он равен обычному определению факториала.
+
+\func fac (n : Nat): Nat
+  | 0 => 1
+  | suc x => suc x * fac x
+
+\func facTail (n : Nat): Nat => aux 1 n
+  \where
+  \func aux (acc n : Nat): Nat \elim n
+    | 0 => acc
+    | suc n => aux (acc * suc n) n
+
+\func fac=facTail (n : Nat) : fac n = facTail n \elim n
+  | 0 => idp
+  | suc n => rewriteI aux $ rewrite (*-comm {1} {n}) idp
+
+\func aux (n acc : Nat) : acc * fac n = facTail.aux acc n \elim n, acc
+  | 0, 0 => idp
+  | 0, suc acc => idp
+  | suc n, 0 => rewriteI NatSemiring.*-assoc $ rewrite (*-comm {0} {n}) $ aux n 0
+  | suc n, suc acc => rewriteI NatSemiring.*-assoc $ rewrite (*-comm {suc acc} {n}) $ aux n (suc (n * acc Nat.+ n Nat.+ acc))
 
 -- 5. Определите функцию, которая проверяет правильность скобочной последовательности.
 --    Докажите ее корректность.
